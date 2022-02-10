@@ -9,8 +9,8 @@
 # Dependencies
 #===============================================================================
 
-$ModuleDependencies = @( 'CodeCastor.PowerShell.Core' )
-$FunctionDependencies = @( 'Show-ExceptionDetails','Get-ScriptDirectory', 'New-Directory' )
+$ModuleDependencies = @( 'PowerShell.Module.Core','PowerShell.Module.Github' )
+$FunctionDependencies = @( 'Show-ExceptionDetails','Get-ScriptDirectory', 'New-Directory','ConvertFrom-Ctime','ConvertTo-Ctime' )
 $EnvironmentVariable = @( 'OrganizationHKCU', 'OrganizationHKLM' )
 
 try{
@@ -59,5 +59,9 @@ try{
         }
     })
 }catch{
+
+    Write-Host "[ERROR] " -f DarkRed -NoNewLine
+    Write-Host "$_"
+    #throw "Error"
 
 }
