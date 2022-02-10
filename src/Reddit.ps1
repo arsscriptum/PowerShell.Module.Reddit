@@ -11,6 +11,29 @@ function Script:AutoUpdateProgress {        # NOEXPORT
     if($Script:StepNumber -lt $Script:TotalSteps){$Script:StepNumber++}
 }
 
+function Get-AuthorizationHeader { # NOEXPORT
+    [CmdletBinding()]
+    [OutputType([System.String])]
+    param (
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true
+        )]
+        [PSCredential]
+        [System.Management.Automation.CredentialAttribute()]$Credential
+    )
+    
+    process {
+        'Basic {0}' -f (
+            [System.Convert]::ToBase64String(
+                [System.Text.Encoding]::ASCII.GetBytes(
+                    ('{0}:{1}' -f $Credential.UserName, $Credential.GetNetworkCredential().Password)
+                )# End [System.Text.Encoding]::ASCII.GetBytes(
+            )# End [System.Convert]::ToBase64String(
+        )# End 'Basic {0}' -f
+    }# End process
+}# End Get-AuthorizationHeader
 
 function Get-RedditUrl {
     [CmdletBinding(SupportsShouldProcess)]
@@ -172,19 +195,19 @@ function Get-RedditAuthenticationToken{
         }
         if($Exists){
             $NowTime = Get-Date 
-            $NowTimeString = '{0}' -f ([system.string]::format('{0:yyyyMMddHHmmss.000000+000}',$NowTime))
-            $TimeExpired = Get-RegistryValue -Path "$RegPath" -Name 'expiration_time'
-            $ntm = [System.Management.ManagementDateTimeConverter]::ToDateTime( $NowTimeString )
-            $ext = [System.Management.ManagementDateTimeConverter]::ToDateTime( $TimeExpired )
-            Write-Verbose "Previous expires on $ExpirationTime"
-            $Diff = $ntm-$ext
-            Write-Verbose "Diff $Diff"
+            $NowTimeSeconds = ConvertTo-CTime($NowTime)
+            $TimeExpiredSeconds = Get-RegistryValue -Path "$RegPath" -Name 'expiration_time'
+        
+            $Diff = $NowTimeSeconds-$TimeExpiredSeconds
+            Write-Verbose "NowTimeSeconds $NowTimeSeconds, TimeExpiredSeconds $TimeExpiredSeconds, Diff $Diff"
             $Token = Get-RegistryValue -Path "$RegPath" -Name 'access_token'
-            if($Diff -gt 0){
-                Write-Verbose "Use existing $Token"
+            if($Diff -lt 0){
+                $UpdateWhen = 1 - $Diff 
+                Write-Verbose "Use existing $Token, Update in $UpdateWhen seconds"
                 return $Token
             }
         }
+        
         $UserCredz = Get-AppCredentials PowerShell.Module.Reddit
         $AppCredz = Get-AppCredentials RedditScript
         [String]$AuthBaseUrl =  Get-RedditUrl -Action 'auth'
@@ -212,17 +235,17 @@ function Get-RedditAuthenticationToken{
         Write-Verbose "Invoke-WebRequest Response: $Response"
        
         [DateTime]$NowTime = Get-Date
-        [DateTime]$ExpirationTime = $NowTime.AddSeconds(-$ExpiresInSecs)
+        [DateTime]$ExpirationTime = $NowTime.AddSeconds($ExpiresInSecs)
 
-        $NowTimeString = '{0}' -f ([system.string]::format('{0:yyyyMMddHHmmss.000000+000}',$NowTime))
-        $ExpirationTimeString = '{0}' -f ([system.string]::format('{0:yyyyMMddHHmmss.000000+000}',$ExpirationTime))
+        $NowTimeSeconds = ConvertTo-CTime($NowTime)
+        $ExpirationTimeSeconds = ConvertTo-CTime($ExpirationTime)
    
        
         $Null=New-Item -Path $RegPath -ItemType Directory -Force
-        Set-RegistryValue -Path "$RegPath" -Name 'access_token' -Value $AccessToken 
-        Set-RegistryValue -Path "$RegPath" -Name 'created_on' -Value $NowTimeString 
-        Set-RegistryValue -Path "$RegPath" -Name 'expiration_time' -Value $ExpirationTimeString 
-        Set-RegistryValue -Path "$RegPath" -Name 'scope' -Value $Scope
+        $Null = Set-RegistryValue -Path "$RegPath" -Name 'access_token' -Value $AccessToken 
+        $Null = Set-RegistryValue -Path "$RegPath" -Name 'created_on' -Value $NowTimeSeconds
+        $Null = Set-RegistryValue -Path "$RegPath" -Name 'expiration_time' -Value $ExpirationTimeSeconds
+        $Null = Set-RegistryValue -Path "$RegPath" -Name 'scope' -Value $Scope
 
         return $AccessToken
     }catch{
