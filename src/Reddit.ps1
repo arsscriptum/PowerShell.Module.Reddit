@@ -60,6 +60,36 @@ function Get-RedditUrl {
     return $result
 }
 
+function Get-RedditUserCredentialID { 
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$Id
+    )
+    $Credz = "PowerShell.Module.Reddit"
+
+    if($Id -eq 'radicaltronic'){
+        $Credz = "Reddit_radicaltronic"
+    }
+    
+    return $Credz
+}
+
+function Get-RedditAppCredentialID { 
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$Id
+    )
+    $Credz = "RedditScript"
+   
+    if($Id -eq 'radicaltronic'){
+        $Credz = "RedditPowerShell_radicaltronic"   
+    }
+    
+    return $Credz
+}
+
 function Test-RedditLog{ 
     [CmdletBinding(SupportsShouldProcess)]
     param ()
@@ -180,6 +210,8 @@ function Set-RedditDefaultServer {
 function Get-RedditAuthenticationToken{
     [CmdletBinding(SupportsShouldProcess)]
     param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$CredId,        
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Git Username")]
         [switch]$Force
     ) 
@@ -208,8 +240,12 @@ function Get-RedditAuthenticationToken{
             }
         }
         
-        $UserCredz = Get-AppCredentials PowerShell.Module.Reddit
-        $AppCredz = Get-AppCredentials RedditScript
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
+        if ($CredId -ne $Null) {
+            $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
+            $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
+        }
         [String]$AuthBaseUrl =  Get-RedditUrl -Action 'auth'
 
         $Params = @{
@@ -249,7 +285,7 @@ function Get-RedditAuthenticationToken{
 
         return $AccessToken
     }catch{
-        Show-ExceptionDetails $_
+        Show-ExceptionDetails $_ -ShowStack
     }
 }
 
@@ -266,8 +302,8 @@ function Get-RedditMe{
         $RegPath = Join-Path $RegPath 'oAuth'
 
        
-        $UserCredz = Get-AppCredentials PowerShell.Module.Reddit
-        $AppCredz = Get-AppCredentials RedditScript
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
         [String]$Url =  Get-RedditUrl -Action 'me'
  
         $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
@@ -291,42 +327,142 @@ function Get-RedditMe{
          Write-Verbose "Invoke-WebRequest Response: $Response"
 }
 
-function Get-RedditComments{
+
+
+
+function Get-RedditUserData{
     [CmdletBinding(SupportsShouldProcess)]
-    param ()    
-        $UserCredz = Get-AppCredentials PowerShell.Module.Reddit
-        $AppCredz = Get-AppCredentials RedditScript
-        $User = $UserCredz.UserName
-        [String]$Url = "https://oauth.reddit.com/user/$User/comments"
-        $BodyData = @{
-            grant_type  = 'password'
-            username    = $UserCredz.UserName
-            password    = $UserCredz.GetNetworkCredential().Password    
-            context     = 2
-            sort        = 'top'
-            t           = 'all'
-            type        = 'comments'
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username,   
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [ValidateSet("overview","submitted","comments","upvoted","downvoted","saved","hidden","gilded")]
+        [String]$Type,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$CredId,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [int]$Count=100
+    )   
+
+        $RegPath = Get-RedditModuleRegistryPath
+        if( $RegPath -eq "" ) { throw "not in module"; return ;}
+        $RegPath = Join-Path $RegPath 'oAuth'
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
+        if ($PSBoundParameters.ContainsKey('CredId')) {
+            $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
+            $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
         }
+        $ThisUser = $UserCredz.UserName
+        $base = 'https://oauth.reddit.com'
+        Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
+        Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
+        if(($Username -eq $Null)-Or($Username -eq '')){
+            $Username = $ThisUser
+        }
+        $base = 'https://oauth.reddit.com'
+        [String]$Url = "$base/user/$Username/$Type"
+
+ 
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId)
         $Params = @{
             Uri             = $Url
-            Body            = $BodyData
+             Body            = @{
+                username   = $Username
+                limit      = $Count
+            }
             UserAgent       = Get-RedditModuleUserAgent
-            Headers         = Get-RedditDefaultHeaders
+            Headers         = @{
+                Authorization = $AuStr
+            }
             Method          = 'GET'
             UseBasicParsing = $true
         }      
-
-
-
-
-        $P = $Params | ConvertTo-Json
-        Write-Verbose "Invoke-WebRequest Url: $Url P = $P"
-         $Response = (Invoke-WebRequest  @Params).Content | ConvertFrom-Json  
-         write-host "$Response"
-         Write-Verbose "Invoke-WebRequest Response: $Response"
+       
+        $Response = (Invoke-WebRequest  @Params).Content | ConvertFrom-Json  
+        Write-Verbose "Invoke-WebRequest Response: $Response"
+        $Response
 }
 
+function Get-RedditComments{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username      
+    )   
 
+    $Response = Get-RedditUserData -Username $Username -Type "comments"   
+    $Response
+}
+
+function Get-RedditPosts{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username     
+    )   
+
+    $Response = Get-RedditUserData -Username $Username -Type "submitted"
+    $Response
+}
+
+function Remove-RedditPost{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username,        
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Id
+    )   
+
+        $RegPath = Get-RedditModuleRegistryPath
+        if( $RegPath -eq "" ) { throw "not in module"; return ;}
+        $RegPath = Join-Path $RegPath 'oAuth'
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
+
+
+        Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
+        Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
+
+        $ThisUser = $UserCredz.UserName
+        $base = 'https://oauth.reddit.com'
+        
+        if(($Username -eq $Null)-Or($Username -eq '')){
+            $Username = $ThisUser
+        }
+        $base = 'https://oauth.reddit.com'
+        [String]$Url = "$base/api/del"
+
+ 
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
+        $Params = @{
+            Uri             = $Url
+             Body            = @{
+                id         = $Id
+            grant_type  = 'password'
+            username    = $Username  
+            password    = $UserCredz.GetNetworkCredential().Password                    
+            }
+            UserAgent       = Get-RedditModuleUserAgent
+            Headers         = @{
+                Authorization = $AuStr
+            }
+            Method          = 'POST'
+            UseBasicParsing = $true
+        }      
+       
+        $ResponseContent = (Invoke-WebRequest  @Params).Content
+        Write-Verbose "Invoke-WebRequest Response: $ResponseContent"
+        $Response
+}
 
 function Get-RedditDefaultHeaders { 
     [CmdletBinding(SupportsShouldProcess)]
@@ -358,8 +494,8 @@ function Get-RedditUserAvailable{
         [ValidateNotNullOrEmpty()]
         [String]$Username     
     )   
-        $UserCredz = Get-AppCredentials PowerShell.Module.Reddit
-        $AppCredz = Get-AppCredentials RedditScript
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
         $User = $UserCredz.UserName
         $base = 'https://oauth.reddit.com'
         $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
@@ -404,28 +540,28 @@ function Get-RedditUserInfo{
         [ValidateNotNullOrEmpty()]
         [String]$Username     
     )   
-        $UserCredz = Get-AppCredentials PowerShell.Module.Reddit
-        $AppCredz = Get-AppCredentials RedditScript
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
         $User = $UserCredz.UserName
         $base = 'https://oauth.reddit.com'
-        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
         [String]$Url = "$base/$Username/about"
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
+       
         $HeadersData = @{
             Authorization = $AuStr
-            user        = $Username
         }
         $BodyData = @{
             grant_type  = 'password'
-            username    = $UserCredz.UserName
+            username    = $Username  
             password    = $UserCredz.GetNetworkCredential().Password    
-            user = $Username
+            id          = ''
         }
         $Params = @{
             Uri             = $Url
             Body            = $BodyData
             UserAgent       = Get-RedditModuleUserAgent
             Headers         = $HeadersData
-            Method          = 'GET'
+            Method          = 'POST'
             UseBasicParsing = $true
         }      
 
@@ -452,8 +588,8 @@ function Invoke-GetNewPowerShell{
         [String]$Username     
     )   
 
-        $UserCredz = Get-AppCredentials PowerShell.Module.Reddit
-        $AppCredz = Get-AppCredentials RedditScript
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
         $ThisUser = $UserCredz.UserName
         $base = 'https://oauth.reddit.com'
         
@@ -491,7 +627,8 @@ function Invoke-GetNewPowerShell{
 }
 
 
-function Get-PostList{
+
+function Get-PostNames{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
@@ -504,24 +641,127 @@ function Get-PostList{
         $Data | Export-Clixml -Path $Temp
     }
     [datetime]$epoch = '1970-01-01 00:00:00'    
-    
-    $List = $Data.data.children | Sort -Property 'created_utc'
+    $AllNames = [System.Collections.ArrayList]::new()
+    $List = $Data.data.children
     foreach($post in $List){
-        $url = $post.data.url ; 
+        $name = $post.data.name ; 
         $title = $post.data.title ; 
-        $num_comments = $post.data.num_comments ; 
         $created_utc = $post.data.created_utc ; 
         $author = $post.data.author ; 
         $selftext = $post.data.selftext ; 
         [datetime]$When = $epoch.AddSeconds($created_utc)
-        [String]$WhenStr = '{0}' -f ([system.string]::format('{0: MM-dd HH:mm}',$When))
-        write-host -f DarkRed "==================================" ; 
-        write-host -f DarkCyan "author $author" ; 
-        write-host -f DarkCyan "num_comments $num_comments" ; 
-        write-host -f Magenta "-- title $title" ; 
-        write-host -f DarkGray "-- WhenStr $WhenStr" ; 
-        write-host -f DarkYellow "`n$selftext" ; 
-        write-host -f DarkRed "=================================="  ;
+        [String]$WhenStr = '{0}' -f ([system.string]::format('{0:MM-dd HH:mm}',$When))
+        [pscustomobject]$obj = @{
+            Id = $name
+            Title = $title
+            Date = $WhenStr
+        }
+        $Null=$AllNames.Add($obj)
     }
-    return $Temp
+    return $AllNames
+}
+
+
+
+
+
+function Remove-AllRedditPosts{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$CredId,
+        [switch]$Force
+    )   
+
+        if ($PSBoundParameters.ContainsKey('Verbose')) {
+            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+            Write-Host "Verbose OUTPUT" -f Yellow            
+        }
+        $RegPath = Get-RedditModuleRegistryPath
+        if( $RegPath -eq "" ) { throw "not in module"; return ;}
+        $RegPath = Join-Path $RegPath 'oAuth'
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
+
+            
+        $ThisUser = $UserCredz.UserName
+
+        
+        Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
+        Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
+
+        if(($Username -eq $Null)-Or($Username -eq '')){
+            $Username = $ThisUser
+        }
+ 
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId -Force:$Force)
+           
+        $Deleted = [System.Collections.ArrayList]::new()
+        do{
+            $Response =  Get-RedditUserData -Username $Username -Type "comments" -Count 10
+            $Count = $Response.data.children.Count
+            $PostNames = Get-PostNames $Response
+            $PostNamesCount = $PostNames.Count
+            Write-Verbose "$PostNamesCount post to remove"
+            $base = 'https://oauth.reddit.com'
+            [String]$Url = "$base/api/del"
+
+            $Script:TotalSteps = $PostNames.Count
+            $Script:StepNumber = 0
+            $Script:ProgressTitle = "Deleting Posts from $Username"
+
+
+            $HeadersData = @{
+                Authorization = $AuStr
+            }
+            $BodyData = @{
+                grant_type  = 'password'
+                username    = $Username  
+                password    = $UserCredz.GetNetworkCredential().Password    
+                id          = ''
+            }
+            $Params = @{
+                Uri             = $Url
+                Body            = $BodyData
+                UserAgent       = Get-RedditModuleUserAgent
+                Headers         = $HeadersData
+                Method          = 'POST'
+                UseBasicParsing = $true
+            }             
+            ForEach($postdata in $PostNames){
+                $postid = $postdata.Id
+                $title = $postdata.Title
+                $Date = $postdata.Date
+                $Params['Body']['id'] = $postid
+                write-Verbose "Deleting $postid [$title]"
+                $ResponseContent = (Invoke-WebRequest @Params).Content
+                $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
+                if ($PSBoundParameters.ContainsKey('Verbose')) {
+                    write-Verbose "$Script:ProgressMessage"
+                }
+                else{
+                    AutoUpdateProgress    
+                }
+                
+                [pscustomobject]$obj = @{
+                    Id = $postid
+                    Title = $title
+                    Date = $Date
+                }
+                
+                foreach($d in $Deleted){
+                    $DId = $d.Id
+                    if($DId -eq $postid)
+                    {
+                        throw "dupe"
+                    }
+                }
+                $Null = $Deleted.Add($obj)
+            }            
+        }
+        while($Count -gt 0)
+    return $Deleted
 }
