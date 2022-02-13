@@ -68,8 +68,10 @@ function Get-RedditUserCredentialID {
     )
     $Credz = "PowerShell.Module.Reddit"
 
-    if($Id -eq 'radicaltronic'){
+    #if($Id -eq 'radicaltronic'){
+    if($true){
         $Credz = "Reddit_radicaltronic"
+    
     }
     
     return $Credz
@@ -83,7 +85,8 @@ function Get-RedditAppCredentialID {
     )
     $Credz = "RedditScript"
    
-    if($Id -eq 'radicaltronic'){
+    #if($Id -eq 'radicaltronic'){
+    if($true){
         $Credz = "RedditPowerShell_radicaltronic"   
     }
     
@@ -493,50 +496,6 @@ function Get-RedditDefaultBody {
 }
 
 
-function Get-RedditUserAvailable{
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [ValidateNotNullOrEmpty()]
-        [String]$Username     
-    )   
-        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
-        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
-        $User = $UserCredz.UserName
-        $base = 'https://oauth.reddit.com'
-        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
-        [String]$Url = "$base/api/username_available"
-        $HeadersData = @{
-            Authorization = $AuStr
-            user        = $Username
-        }
-        $BodyData = @{
-            grant_type  = 'password'
-            username    = $UserCredz.UserName
-            password    = $UserCredz.GetNetworkCredential().Password    
-            user = $Username
-        }
-        $Params = @{
-            Uri             = $Url
-            Body            = $BodyData
-            UserAgent       = Get-RedditModuleUserAgent
-            Headers         = $HeadersData
-            Method          = 'GET'
-            UseBasicParsing = $true
-        }      
-
-
-        $P = $Params | ConvertTo-Json
-        Write-Verbose "Invoke-WebRequest Url: $Url P = $P"
-        $ResponseJson = (Invoke-WebRequest @Params).Content
-        $ResponseList = $ResponseJson | ConvertFrom-Json | Out-String
-        write-host -f DarkRed "=================================="
-        write-host -f DarkYellow "ResponseJson: $ResponseJson"
-        write-host -f DarkCyan "--------------"
-        write-host -f DarkYellow "ResponseList: $ResponseList"    
-        write-host -f DarkRed "=================================="    
-        Write-Verbose "Invoke-WebRequest Response: $Response"
-}
 
 
 function Get-RedditUserInfo{
@@ -572,26 +531,22 @@ function Get-RedditUserInfo{
         }      
 
 
-        $P = $Params | ConvertTo-Json
-        Write-Verbose "Invoke-WebRequest Url: $Url P = $P"
-        $ResponseJson = (Invoke-WebRequest @Params).Content
-        $ResponseList = $ResponseJson | ConvertFrom-Json | Out-String
-        write-host -f DarkRed "=================================="
-        write-host -f DarkYellow "ResponseJson: $ResponseJson"
-        write-host -f DarkCyan "--------------"
-        write-host -f DarkYellow "ResponseList: $ResponseList"    
-        write-host -f DarkRed "=================================="    
+        Write-Verbose "Invoke-WebRequest Url: $Url"
+        Write-Verbose "Params = $Params"
+        $Response = (Invoke-WebRequest @Params).Content
+        $ResponseJson = $Response | ConvertFrom-Json
         Write-Verbose "Invoke-WebRequest Response: $Response"
+        $Response
 }
 
 
 
-function Invoke-GetNewPowerShell{
+function Invoke-GetNewUkraine{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
         [ValidateNotNullOrEmpty()]
-        [String]$Username     
+        [String]$Search
     )   
 
         $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
@@ -602,7 +557,7 @@ function Invoke-GetNewPowerShell{
         if(($Username -eq $Null)-Or($Username -eq '')){
             $Username = $ThisUser
         }
-        [String]$Url = "$base/r/powershell/new"
+        [String]$Url = "$base/r/ukraine/new"
         $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
         $HeadersData = @{
             Authorization = $AuStr
@@ -610,6 +565,7 @@ function Invoke-GetNewPowerShell{
         }
         $BodyData = @{
             grant_type  = 'password'
+            limit        = 100
             username    = $UserCredz.UserName
             password    = $UserCredz.GetNetworkCredential().Password    
             user        = $Username
@@ -623,50 +579,24 @@ function Invoke-GetNewPowerShell{
             UseBasicParsing = $true
         }      
 
+        Write-Host -n -f Cyan "REDDIT SEARCH "      
+        Write-Host -f DarkCyan "Searching SubReddit with title like $Search..."
+        Write-Verbose "Invoke-WebRequest Url: $Url"
+        Write-Verbose "Params = $Params"
+        $Response = (Invoke-WebRequest @Params).Content
+        $ResponseJson = $Response | ConvertFrom-Json
+        Write-Verbose "Invoke-WebRequest Response: $Response"
 
-        $P = $Params | ConvertTo-Json
-        Write-Verbose "Invoke-WebRequest Url: $Url P = $P"
-        $ResponseJson = (Invoke-WebRequest @Params).Content
-        $ResponseList = $ResponseJson | ConvertFrom-Json
-
-        return $ResponseList
-}
-
-
-
-function Get-PostNames{
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [ValidateNotNullOrEmpty()]
-        [Array]$Data     
-    )   
-    if($Data -eq $Null){
-        $Data = Invoke-GetNewPowerShell
-        $Temp = (New-TemporaryFile).Fullname
-        $Data | Export-Clixml -Path $Temp
-    }
-    [datetime]$epoch = '1970-01-01 00:00:00'    
-    $AllNames = [System.Collections.ArrayList]::new()
-    $List = $Data.data.children
-    foreach($post in $List){
-        $name = $post.data.name ; 
-        $title = $post.data.title ; 
-        $created_utc = $post.data.created_utc ; 
-        $author = $post.data.author ; 
-        $selftext = $post.data.selftext ; 
-        [datetime]$When = $epoch.AddSeconds($created_utc)
-        [String]$WhenStr = '{0}' -f ([system.string]::format('{0:MM-dd HH:mm}',$When))
-        [pscustomobject]$obj = @{
-            Id = $name
-            Title = $title
-            Date = $WhenStr
+        $DataList =  $ResponseList.data.children.data
+        if($Search -ne $Null){
+            ForEach($data in $DataList){
+                $Title = $Data.Title
+                $Name = $Data.Name
+                if($Title -match $Search){
+                  return $Data
+            }
         }
-        $Null=$AllNames.Add($obj)
-    }
-    return $AllNames
 }
-
 
 
 
@@ -858,3 +788,36 @@ function Get-RedditPosts{
         
     return $ToBeDeleted
 }
+# SIG # Begin signature block
+# MIIFxAYJKoZIhvcNAQcCoIIFtTCCBbECAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
+# gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUh/qVmOrtP5EgTUmFMq2HF9a9
+# bO+gggNNMIIDSTCCAjWgAwIBAgIQmkSKRKW8Cb1IhBWj4NDm0TAJBgUrDgMCHQUA
+# MCwxKjAoBgNVBAMTIVBvd2VyU2hlbGwgTG9jYWwgQ2VydGlmaWNhdGUgUm9vdDAe
+# Fw0yMjAyMDkyMzI4NDRaFw0zOTEyMzEyMzU5NTlaMCUxIzAhBgNVBAMTGkFyc1Nj
+# cmlwdHVtIFBvd2VyU2hlbGwgQ1NDMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+# CgKCAQEA60ec8x1ehhllMQ4t+AX05JLoCa90P7LIqhn6Zcqr+kvLSYYp3sOJ3oVy
+# hv0wUFZUIAJIahv5lS1aSY39CCNN+w47aKGI9uLTDmw22JmsanE9w4vrqKLwqp2K
+# +jPn2tj5OFVilNbikqpbH5bbUINnKCDRPnBld1D+xoQs/iGKod3xhYuIdYze2Edr
+# 5WWTKvTIEqcEobsuT/VlfglPxJW4MbHXRn16jS+KN3EFNHgKp4e1Px0bhVQvIb9V
+# 3ODwC2drbaJ+f5PXkD1lX28VCQDhoAOjr02HUuipVedhjubfCmM33+LRoD7u6aEl
+# KUUnbOnC3gVVIGcCXWsrgyvyjqM2WQIDAQABo3YwdDATBgNVHSUEDDAKBggrBgEF
+# BQcDAzBdBgNVHQEEVjBUgBD8gBzCH4SdVIksYQ0DovzKoS4wLDEqMCgGA1UEAxMh
+# UG93ZXJTaGVsbCBMb2NhbCBDZXJ0aWZpY2F0ZSBSb290ghABvvi0sAAYvk29NHWg
+# Q1DUMAkGBSsOAwIdBQADggEBAI8+KceC8Pk+lL3s/ZY1v1ZO6jj9cKMYlMJqT0yT
+# 3WEXZdb7MJ5gkDrWw1FoTg0pqz7m8l6RSWL74sFDeAUaOQEi/axV13vJ12sQm6Me
+# 3QZHiiPzr/pSQ98qcDp9jR8iZorHZ5163TZue1cW8ZawZRhhtHJfD0Sy64kcmNN/
+# 56TCroA75XdrSGjjg+gGevg0LoZg2jpYYhLipOFpWzAJqk/zt0K9xHRuoBUpvCze
+# yrR9MljczZV0NWl3oVDu+pNQx1ALBt9h8YpikYHYrl8R5xt3rh9BuonabUZsTaw+
+# xzzT9U9JMxNv05QeJHCgdCN3lobObv0IA6e/xTHkdlXTsdgxggHhMIIB3QIBATBA
+# MCwxKjAoBgNVBAMTIVBvd2VyU2hlbGwgTG9jYWwgQ2VydGlmaWNhdGUgUm9vdAIQ
+# mkSKRKW8Cb1IhBWj4NDm0TAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEKMAig
+# AoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3AgEL
+# MQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUHyWELLmtXwL3vHP6M6Os
+# uOxUbTIwDQYJKoZIhvcNAQEBBQAEggEA5z3mVcTYIuXwmnm0HWddbmvwYHUlE/oN
+# HKQjdlym5wV06B7f4VmMkhnbsS0tZ1p7Udgwainl5lHZLhh7M2xDVu1uE/folHwx
+# 3YqBWkVXiIKwx3LyEI/f8lZafN2x8tZwDlw6pkjrd0CEGRKENL03FXCH73NJSZKU
+# ADDh7giGQA8ty+aLttKEGRBMu2mfd4Q0eFKIeJkWHkscvWUgd/+0CAmz92Em2xCa
+# mALXA/Rh03lw6tb+TN4Ax85q1ViIzZ3ph/9MmQScNPt2Lt2dAMtrWI0wqxq5sXEw
+# OBai892wbrdb1UP/RRnRTkC1GoVP+1SkkI4Uyhq5HkodAZbyVAiVhw==
+# SIG # End signature block
