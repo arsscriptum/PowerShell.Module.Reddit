@@ -344,6 +344,9 @@ function Get-RedditUserData{
         [ValidateNotNullOrEmpty()]
         [String]$CredId,
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$After="",
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
         [int]$Count=100
     )   
 
@@ -370,7 +373,7 @@ function Get-RedditUserData{
         $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId)
         $Params = @{
             Uri             = $Url
-             Body            = @{
+            Body            = @{
                 username   = $Username
                 limit      = $Count
             }
@@ -380,7 +383,10 @@ function Get-RedditUserData{
             }
             Method          = 'GET'
             UseBasicParsing = $true
-        }      
+        }
+        if($After -ne ''){
+             $Params['Body']['after'] = $after
+        }   
        
         $Response = (Invoke-WebRequest  @Params).Content | ConvertFrom-Json  
         Write-Verbose "Invoke-WebRequest Response: $Response"
@@ -672,8 +678,10 @@ function Remove-AllRedditPosts{
         [ValidateNotNullOrEmpty()]
         [String]$Username,
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [String]$CredId,
-        [switch]$Force
+        [String]$CredId='',
+        [switch]$Force,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [int]$GroupBy = 50
     )   
 
         if ($PSBoundParameters.ContainsKey('Verbose')) {
@@ -686,35 +694,21 @@ function Remove-AllRedditPosts{
         $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
         $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
 
-            
-        $ThisUser = $UserCredz.UserName
-
-        
+    
         Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
         Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
+    
+        $ToBeDeleted=(Get-RedditPosts -Username $Username -CredId $CredId -Force  -GroupBy $GroupBy).Id
+        $ToBeDeletedCount = $ToBeDeleted.Count
+        Write-Verbose "$PostNamesCount post to remove"
+        $base = 'https://oauth.reddit.com'
+        [String]$Url = "$base/api/del"
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId -Force:$false)
 
-        if(($Username -eq $Null)-Or($Username -eq '')){
-            $Username = $ThisUser
-        }
- 
-        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId -Force:$Force)
-           
-        $Deleted = [System.Collections.ArrayList]::new()
-        do{
-            $Response =  Get-RedditUserData -Username $Username -Type "comments" -Count 10
-            $Count = $Response.data.children.Count
-            $PostNames = Get-PostNames $Response
-            $PostNamesCount = $PostNames.Count
-            Write-Verbose "$PostNamesCount post to remove"
-            $base = 'https://oauth.reddit.com'
-            [String]$Url = "$base/api/del"
-
-            $Script:TotalSteps = $PostNames.Count
-            $Script:StepNumber = 0
-            $Script:ProgressTitle = "Deleting Posts from $Username"
-
-
-            $HeadersData = @{
+        $Script:TotalSteps = $ToBeDeletedCount
+        $Script:StepNumber = 0
+        $Script:ProgressTitle = "Deleting Posts from $Username"
+        $HeadersData = @{
                 Authorization = $AuStr
             }
             $BodyData = @{
@@ -730,13 +724,12 @@ function Remove-AllRedditPosts{
                 Headers         = $HeadersData
                 Method          = 'POST'
                 UseBasicParsing = $true
-            }             
-            ForEach($postdata in $PostNames){
-                $postid = $postdata.Id
-                $title = $postdata.Title
-                $Date = $postdata.Date
+            }                  
+     
+            ForEach($postid in $ToBeDeleted){
+ 
                 $Params['Body']['id'] = $postid
-                write-Verbose "Deleting $postid [$title]"
+                write-Verbose "Deleting $postid"
                 $ResponseContent = (Invoke-WebRequest @Params).Content
                 $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
                 if ($PSBoundParameters.ContainsKey('Verbose')) {
@@ -745,23 +738,123 @@ function Remove-AllRedditPosts{
                 else{
                     AutoUpdateProgress    
                 }
-                
-                [pscustomobject]$obj = @{
-                    Id = $postid
-                    Title = $title
-                    Date = $Date
-                }
-                
-                foreach($d in $Deleted){
-                    $DId = $d.Id
-                    if($DId -eq $postid)
-                    {
-                        throw "dupe"
-                    }
-                }
-                $Null = $Deleted.Add($obj)
+        
+           
             }            
+ 
+
+}
+
+
+
+function Get-RedditPostsCount{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$CredId,
+        [switch]$Force,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [int]$GroupBy = 50
+    )   
+
+        if ($PSBoundParameters.ContainsKey('Verbose')) {
+            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+            Write-Host "Verbose OUTPUT" -f Yellow            
         }
-        while($Count -gt 0)
-    return $Deleted
+        $RegPath = Get-RedditModuleRegistryPath
+        if( $RegPath -eq "" ) { throw "not in module"; return ;}
+        $RegPath = Join-Path $RegPath 'oAuth'
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
+
+        $TotalCount = 0
+        $ThisUser = $UserCredz.UserName
+
+        
+        Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
+        Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
+
+        if(($Username -eq $Null)-Or($Username -eq '')){
+            $Username = $ThisUser
+        }
+ 
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId -Force:$Force)
+
+        $Response =  Get-RedditUserData -Username $Username -Type "comments" -Count $GroupBy
+        $Count = $Response.data.children.Count
+        while($Count -gt 0){
+            $Count = $Response.data.children.Count
+            if($Count -eq 0){break;}
+            $TotalCount += $Count
+            $PostNames = Get-PostNames $Response
+            $PostNamesCount = $PostNames.Count
+            Write-Verbose "$PostNamesCount post to remove"
+            $index = $Response.data.children.Count - 1
+            $after = $Response.data.children[$index].data.name
+            
+            $Response =  Get-RedditUserData -Username $Username -Type "comments" -Count $GroupBy -After $after
+        }
+        
+    return $TotalCount
+}
+
+
+function Get-RedditPosts{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$CredId,
+        [switch]$Force,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [int]$GroupBy = 50
+    )   
+
+        if ($PSBoundParameters.ContainsKey('Verbose')) {
+            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+            Write-Host "Verbose OUTPUT" -f Yellow            
+        }
+        $RegPath = Get-RedditModuleRegistryPath
+        if( $RegPath -eq "" ) { throw "not in module"; return ;}
+        $RegPath = Join-Path $RegPath 'oAuth'
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
+
+        $TotalCount = 0
+        $ThisUser = $UserCredz.UserName
+
+        
+        Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
+        Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
+
+        if(($Username -eq $Null)-Or($Username -eq '')){
+            $Username = $ThisUser
+        }
+ 
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId -Force:$Force)
+           
+        $ToBeDeleted = [System.Collections.ArrayList]::new()
+        $Response =  Get-RedditUserData -Username $Username -Type "comments" -Count $GroupBy
+        $Count = $Response.data.children.Count
+        while($Count -gt 0){
+            $Count = $Response.data.children.Count
+            if($Count -eq 0){break;}
+            $TotalCount += $Count
+            $PostNames = Get-PostNames $Response
+            $PostNamesCount = $PostNames.Count
+            Write-Verbose "$PostNamesCount post to remove"
+            $index = $Response.data.children.Count - 1
+            $after = $Response.data.children[$index].data.name
+            ForEach($postdata in $PostNames){
+                $Null = $ToBeDeleted.Add($postdata)
+            }            
+            $Response =  Get-RedditUserData -Username $Username -Type "comments" -Count $GroupBy -After $after
+        }
+        
+    return $ToBeDeleted
 }
