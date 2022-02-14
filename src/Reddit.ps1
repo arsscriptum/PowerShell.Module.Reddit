@@ -68,8 +68,8 @@ function Get-RedditUserCredentialID {
     )
     $Credz = "PowerShell.Module.Reddit"
 
-    #if($Id -eq 'radicaltronic'){
-    if($true){
+    $DevAccount = Get-RedditDevAccountOverride
+    if(($Id -eq 'radicaltronic')-or($DevAccount -eq 'radicaltronic')){
         $Credz = "Reddit_radicaltronic"
     
     }
@@ -84,14 +84,44 @@ function Get-RedditAppCredentialID {
         [String]$Id
     )
     $Credz = "RedditScript"
-   
-    #if($Id -eq 'radicaltronic'){
-    if($true){
+    $DevAccount = Get-RedditDevAccountOverride
+
+    if(($Id -eq 'radicaltronic')-or($DevAccount -eq 'radicaltronic')){
         $Credz = "RedditPowerShell_radicaltronic"   
     }
-    
+
     return $Credz
 }
+function Get-RedditDevAccountOverride { 
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+
+    $RegPath = Get-RedditModuleRegistryPath
+    if( $RegPath -eq "" ) { throw "not in module"; return ;}
+    $DevAccount = ''
+    $DevAccountOverride = Test-RegistryValue -Path "$RegPath" -Entry 'override_dev_account'
+    if($DevAccountOverride){
+        $DevAccount = Get-RegistryValue -Path "$RegPath" -Entry 'override_dev_account'
+    }
+    
+    return $DevAccount
+}
+
+function Set-RedditDevAccountOverride { 
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$Id
+    )
+
+    $RegPath = Get-RedditModuleRegistryPath
+    if( $RegPath -eq "" ) { throw "not in module"; return ;}
+    New-RegistryValue -Path "$RegPath" -Entry 'override_dev_account' -Value "$Id" 'String'
+    Set-RegistryValue -Path "$RegPath" -Entry 'override_dev_account' -Value "$Id"
+    
+    return $DevAccount
+}
+
 
 function Test-RedditLog{ 
     [CmdletBinding(SupportsShouldProcess)]
@@ -396,29 +426,6 @@ function Get-RedditUserData{
         $Response
 }
 
-function Get-RedditComments{
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [ValidateNotNullOrEmpty()]
-        [String]$Username      
-    )   
-
-    $Response = Get-RedditUserData -Username $Username -Type "comments"   
-    $Response
-}
-
-function Get-RedditPosts{
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [ValidateNotNullOrEmpty()]
-        [String]$Username     
-    )   
-
-    $Response = Get-RedditUserData -Username $Username -Type "submitted"
-    $Response
-}
 
 function Remove-RedditPost{
     [CmdletBinding(SupportsShouldProcess)]
@@ -499,12 +506,15 @@ function Get-RedditDefaultBody {
 
 
 
-function Remove-AllRedditPosts{
+function Remove-AllRedditEntries{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
         [ValidateNotNullOrEmpty()]
         [String]$Username,
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Force")]
+        [ValidateSet('comments','submitted')]
+        [string]$Type,
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
         [String]$CredId='',
         [switch]$Force,
@@ -526,7 +536,9 @@ function Remove-AllRedditPosts{
         Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
         Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
     
-        $ToBeDeleted=(Get-RedditPosts -Username $Username -CredId $CredId -Force  -GroupBy $GroupBy).Id
+        $ToBeDeleted=Get-RedditUserData -Username $Username -Type $Type
+
+
         $ToBeDeletedCount = $ToBeDeleted.Count
         Write-Verbose "$PostNamesCount post to remove"
         $base = 'https://oauth.reddit.com'
