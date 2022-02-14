@@ -3,6 +3,65 @@
 # You use the /api/submit endpoint, but set kind to crosspost instead of link, and the fullname of the original post as crosspost_fullname.
 
 
+function InvokeGetNewUkraine{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Search
+    )   
+
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
+        $ThisUser = $UserCredz.UserName
+        $base = 'https://oauth.reddit.com'
+        
+        if(($Username -eq $Null)-Or($Username -eq '')){
+            $Username = $ThisUser
+        }
+        [String]$Url = "$base/r/ukraine/new"
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
+        $HeadersData = @{
+            Authorization = $AuStr
+            user        = $Username
+        }
+        $BodyData = @{
+            grant_type  = 'password'
+            limit        = 100
+            username    = $UserCredz.UserName
+            password    = $UserCredz.GetNetworkCredential().Password    
+            user        = $Username
+        }
+        $Params = @{
+            Uri             = $Url
+            Body            = $BodyData
+            UserAgent       = Get-RedditModuleUserAgent
+            Headers         = $HeadersData
+            Method          = 'GET'
+            UseBasicParsing = $true
+        }      
+
+        Write-Host -n -f Cyan "REDDIT SEARCH "      
+        Write-Host -f DarkCyan "Searching SubReddit with title like $Search..."
+        Write-Verbose "Invoke-WebRequest Url: $Url"
+        Write-Verbose "Params = $Params"
+        $Response = (Invoke-WebRequest @Params).Content
+        $ResponseJson = $Response | ConvertFrom-Json
+        Write-Verbose "Invoke-WebRequest Response: $Response"
+
+        $DataList =  $ResponseList.data.children.data
+        if($Search -ne $Null){
+            ForEach($data in $DataList){
+                $Title = $Data.Title
+                $Name = $Data.Name
+                if($Title -match $Search){
+                  return $Data
+            }
+        }
+    }
+}
+
+
 
 function New-RedditCrossPost{
     [CmdletBinding(SupportsShouldProcess)]
