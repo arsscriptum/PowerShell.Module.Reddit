@@ -5,13 +5,22 @@
  #>
 
 
+function Write-ProgressHelper{
 
-function Script:AutoUpdateProgress {        # NOEXPORT
-    Write-Progress -Activity $Script:ProgressTitle -Status $Script:ProgressMessage -PercentComplete (($Script:StepNumber / $Script:TotalSteps) * 100)
-    if($Script:StepNumber -lt $Script:TotalSteps){$Script:StepNumber++}
+    param () 
+    try{
+        if($Script:TotalSteps -eq 0){return}
+        Write-Progress -Activity $Script:ProgressTitle -Status $Script:ProgressMessage -PercentComplete (($Script:StepNumber /  $Script:TotalSteps) * 100)
+    }catch{
+        Write-Host "⌛ StepNumber $Script:StepNumber" -f DarkYellow
+        Write-Host "⌛ ScriptSteps $Script:TotalSteps" -f DarkYellow
+        $val = (($Script:StepNumber / $Script:TotalSteps) * 100)
+        Write-Host "⌛ PercentComplete $val" -f DarkYellow
+        Show-ExceptionDetails $_ -ShowStack
+    }
 }
 
-function Get-AuthorizationHeader { # NOEXPORT
+function Get-AuthorizationHeader{
     [CmdletBinding()]
     [OutputType([System.String])]
     param (
@@ -35,7 +44,7 @@ function Get-AuthorizationHeader { # NOEXPORT
     }# End process
 }# End Get-AuthorizationHeader
 
-function Get-RedditUrl {
+function Get-RedditUrl{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Overwrite if present", Position=0)]
@@ -297,6 +306,12 @@ function Get-RedditAuthenticationToken{
         }
         Write-Verbose "Invoke-WebRequest $Params"
         $Response = (Invoke-WebRequest  @Params).Content | ConvertFrom-Json
+        $ErrorType = $Response.error
+        if($ErrorType -ne $Null){
+            throw "ERROR RETURNED $ErrorType"
+            return $Null
+        }
+
         $AccessToken = $Response.access_token
         $TokenType = $Response.token_type
         $ExpiresInSecs = $Response.expires_in
@@ -504,90 +519,41 @@ function Get-RedditDefaultBody {
 
 
 
-
-
 function Remove-AllRedditEntries{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [ValidateNotNullOrEmpty()]
-        [String]$Username,
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Force")]
-        [ValidateSet('comments','submitted')]
-        [string]$Type,
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [String]$CredId='',
-        [switch]$Force,
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [int]$GroupBy = 50
-    )   
-
+        [switch]$Comments
+    )
+    if($Comments){
+        $allposts = Get-RedditComments
+        $Script:ProgressTitle = "Removing Comments"
+    }else{
+        $allposts = Get-RedditSubmittedPosts
+        $Script:ProgressTitle = "Removing Submitted Posts"
+    }
+    
+    $Script:StepNumber = 0
+    $Script:TotalSteps = $allposts.Count
+    $Script:ProgressMessage = "Removing Entries"
+    Write-ProgressHelper    
+    ForEach($p in $allposts){ 
+        $idp = $p.Id ; 
+        Remove-RedditPost -Id "$idp"; 
+        $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
         if ($PSBoundParameters.ContainsKey('Verbose')) {
-            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
-            Write-Host "Verbose OUTPUT" -f Yellow            
+            write-Verbose "$Script:ProgressMessage"
         }
-        $RegPath = Get-RedditModuleRegistryPath
-        if( $RegPath -eq "" ) { throw "not in module"; return ;}
-        $RegPath = Join-Path $RegPath 'oAuth'
-        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
-        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
-
-    
-        Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
-        Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
-    
-        $ToBeDeleted=Get-RedditUserData -Username $Username -Type $Type
-
-
-        $ToBeDeletedCount = $ToBeDeleted.Count
-        Write-Verbose "$PostNamesCount post to remove"
-        $base = 'https://oauth.reddit.com'
-        [String]$Url = "$base/api/del"
-        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId -Force:$false)
-
-        $Script:TotalSteps = $ToBeDeletedCount
-        $Script:StepNumber = 0
-        $Script:ProgressTitle = "Deleting Posts from $Username"
-        $HeadersData = @{
-                Authorization = $AuStr
-            }
-            $BodyData = @{
-                grant_type  = 'password'
-                username    = $Username  
-                password    = $UserCredz.GetNetworkCredential().Password    
-                id          = ''
-            }
-            $Params = @{
-                Uri             = $Url
-                Body            = $BodyData
-                UserAgent       = Get-RedditModuleUserAgent
-                Headers         = $HeadersData
-                Method          = 'POST'
-                UseBasicParsing = $true
-            }                  
-     
-            ForEach($postid in $ToBeDeleted){
- 
-                $Params['Body']['id'] = $postid
-                write-Verbose "Deleting $postid"
-                $ResponseContent = (Invoke-WebRequest @Params).Content
-                $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
-                if ($PSBoundParameters.ContainsKey('Verbose')) {
-                    write-Verbose "$Script:ProgressMessage"
-                }
-                else{
-                    AutoUpdateProgress    
-                }
-        
-           
-            }            
- 
-
+        else{
+                Write-ProgressHelper    
+                $Script:StepNumber++
+        }
+    }
 }
 
 
 
-function Get-RedditPostsCount{
+function Get-RedditCommentsCount{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
@@ -642,7 +608,7 @@ function Get-RedditPostsCount{
 }
 
 
-function Get-RedditPosts{
+function Get-RedditComments{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
@@ -698,36 +664,61 @@ function Get-RedditPosts{
         
     return $ToBeDeleted
 }
-# SIG # Begin signature block
-# MIIFxAYJKoZIhvcNAQcCoIIFtTCCBbECAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
-# gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUh/qVmOrtP5EgTUmFMq2HF9a9
-# bO+gggNNMIIDSTCCAjWgAwIBAgIQmkSKRKW8Cb1IhBWj4NDm0TAJBgUrDgMCHQUA
-# MCwxKjAoBgNVBAMTIVBvd2VyU2hlbGwgTG9jYWwgQ2VydGlmaWNhdGUgUm9vdDAe
-# Fw0yMjAyMDkyMzI4NDRaFw0zOTEyMzEyMzU5NTlaMCUxIzAhBgNVBAMTGkFyc1Nj
-# cmlwdHVtIFBvd2VyU2hlbGwgQ1NDMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-# CgKCAQEA60ec8x1ehhllMQ4t+AX05JLoCa90P7LIqhn6Zcqr+kvLSYYp3sOJ3oVy
-# hv0wUFZUIAJIahv5lS1aSY39CCNN+w47aKGI9uLTDmw22JmsanE9w4vrqKLwqp2K
-# +jPn2tj5OFVilNbikqpbH5bbUINnKCDRPnBld1D+xoQs/iGKod3xhYuIdYze2Edr
-# 5WWTKvTIEqcEobsuT/VlfglPxJW4MbHXRn16jS+KN3EFNHgKp4e1Px0bhVQvIb9V
-# 3ODwC2drbaJ+f5PXkD1lX28VCQDhoAOjr02HUuipVedhjubfCmM33+LRoD7u6aEl
-# KUUnbOnC3gVVIGcCXWsrgyvyjqM2WQIDAQABo3YwdDATBgNVHSUEDDAKBggrBgEF
-# BQcDAzBdBgNVHQEEVjBUgBD8gBzCH4SdVIksYQ0DovzKoS4wLDEqMCgGA1UEAxMh
-# UG93ZXJTaGVsbCBMb2NhbCBDZXJ0aWZpY2F0ZSBSb290ghABvvi0sAAYvk29NHWg
-# Q1DUMAkGBSsOAwIdBQADggEBAI8+KceC8Pk+lL3s/ZY1v1ZO6jj9cKMYlMJqT0yT
-# 3WEXZdb7MJ5gkDrWw1FoTg0pqz7m8l6RSWL74sFDeAUaOQEi/axV13vJ12sQm6Me
-# 3QZHiiPzr/pSQ98qcDp9jR8iZorHZ5163TZue1cW8ZawZRhhtHJfD0Sy64kcmNN/
-# 56TCroA75XdrSGjjg+gGevg0LoZg2jpYYhLipOFpWzAJqk/zt0K9xHRuoBUpvCze
-# yrR9MljczZV0NWl3oVDu+pNQx1ALBt9h8YpikYHYrl8R5xt3rh9BuonabUZsTaw+
-# xzzT9U9JMxNv05QeJHCgdCN3lobObv0IA6e/xTHkdlXTsdgxggHhMIIB3QIBATBA
-# MCwxKjAoBgNVBAMTIVBvd2VyU2hlbGwgTG9jYWwgQ2VydGlmaWNhdGUgUm9vdAIQ
-# mkSKRKW8Cb1IhBWj4NDm0TAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEKMAig
-# AoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3AgEL
-# MQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUHyWELLmtXwL3vHP6M6Os
-# uOxUbTIwDQYJKoZIhvcNAQEBBQAEggEA5z3mVcTYIuXwmnm0HWddbmvwYHUlE/oN
-# HKQjdlym5wV06B7f4VmMkhnbsS0tZ1p7Udgwainl5lHZLhh7M2xDVu1uE/folHwx
-# 3YqBWkVXiIKwx3LyEI/f8lZafN2x8tZwDlw6pkjrd0CEGRKENL03FXCH73NJSZKU
-# ADDh7giGQA8ty+aLttKEGRBMu2mfd4Q0eFKIeJkWHkscvWUgd/+0CAmz92Em2xCa
-# mALXA/Rh03lw6tb+TN4Ax85q1ViIzZ3ph/9MmQScNPt2Lt2dAMtrWI0wqxq5sXEw
-# OBai892wbrdb1UP/RRnRTkC1GoVP+1SkkI4Uyhq5HkodAZbyVAiVhw==
-# SIG # End signature block
+
+
+function Get-RedditSubmittedPosts{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [ValidateNotNullOrEmpty()]
+        [String]$Username,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [String]$CredId,
+        [switch]$Force,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [int]$GroupBy = 50
+    )   
+
+        if ($PSBoundParameters.ContainsKey('Verbose')) {
+            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+            Write-Host "Verbose OUTPUT" -f Yellow            
+        }
+        $RegPath = Get-RedditModuleRegistryPath
+        if( $RegPath -eq "" ) { throw "not in module"; return ;}
+        $RegPath = Join-Path $RegPath 'oAuth'
+        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID -Id $CredId)
+        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID -Id $CredId)
+
+        $TotalCount = 0
+        $ThisUser = $UserCredz.UserName
+
+        
+        Write-Verbose "Using User Credentials: $($UserCredz.UserName) / $($UserCredz.GetNetworkCredential().Password)"
+        Write-Verbose "Using App Credentials: $($AppCredz.UserName) / $($AppCredz.GetNetworkCredential().Password)"
+
+        if(($Username -eq $Null)-Or($Username -eq '')){
+            $Username = $ThisUser
+        }
+ 
+        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken -CredId $CredId -Force:$Force)
+           
+        $ToBeDeleted = [System.Collections.ArrayList]::new()
+        $Response =  Get-RedditUserData -Username $Username -Type "submitted" -Count $GroupBy
+        $Count = $Response.data.children.Count
+        while($Count -gt 0){
+            $Count = $Response.data.children.Count
+            if($Count -eq 0){break;}
+            $TotalCount += $Count
+            $PostNames = Get-PostNames $Response
+            $PostNamesCount = $PostNames.Count
+            Write-Verbose "$PostNamesCount post to remove"
+            $index = $Response.data.children.Count - 1
+            $after = $Response.data.children[$index].data.name
+            ForEach($postdata in $PostNames){
+                $Null = $ToBeDeleted.Add($postdata)
+            }            
+            $Response =  Get-RedditUserData -Username $Username -Type "submitted" -Count $GroupBy -After $after
+        }
+        
+    return $ToBeDeleted
+}
