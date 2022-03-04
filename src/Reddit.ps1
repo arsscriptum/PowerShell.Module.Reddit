@@ -595,7 +595,7 @@ function Get-RedditCommentsCount{
             $Count = $Response.data.children.Count
             if($Count -eq 0){break;}
             $TotalCount += $Count
-            $PostNames = Get-PostNames $Response
+            $PostNames = Get-ParsedPostData $Response
             $PostNamesCount = $PostNames.Count
             Write-Verbose "$PostNamesCount post to remove"
             $index = $Response.data.children.Count - 1
@@ -709,7 +709,7 @@ function Get-RedditSubmittedPosts{
             $Count = $Response.data.children.Count
             if($Count -eq 0){break;}
             $TotalCount += $Count
-            $PostNames = Get-PostNames $Response
+            $PostNames = Get-ParsedPostData $Response
             $PostNamesCount = $PostNames.Count
             Write-Verbose "$PostNamesCount post to remove"
             $index = $Response.data.children.Count - 1

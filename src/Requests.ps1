@@ -3,62 +3,72 @@
 # You use the /api/submit endpoint, but set kind to crosspost instead of link, and the fullname of the original post as crosspost_fullname.
 
 
-function InvokeGetNewUkraine{
+function Get-LatestUkrainePosts{
     [CmdletBinding(SupportsShouldProcess)]
-    param(
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [ValidateNotNullOrEmpty()]
-        [String]$Search
-    )   
+    param()
 
-        $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
-        $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
-        $ThisUser = $UserCredz.UserName
-        $base = 'https://oauth.reddit.com'
-        
-        if(($Username -eq $Null)-Or($Username -eq '')){
-            $Username = $ThisUser
-        }
-        [String]$Url = "$base/r/ukraine/new"
-        $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
-        $HeadersData = @{
-            Authorization = $AuStr
-            user        = $Username
-        }
-        $BodyData = @{
-            grant_type  = 'password'
-            limit        = 100
-            username    = $UserCredz.UserName
-            password    = $UserCredz.GetNetworkCredential().Password    
-            user        = $Username
-        }
-        $Params = @{
-            Uri             = $Url
-            Body            = $BodyData
-            UserAgent       = Get-RedditModuleUserAgent
-            Headers         = $HeadersData
-            Method          = 'GET'
-            UseBasicParsing = $true
-        }      
+    $data = Request-LatestUkrainePosts   
+    $i = 0
 
-        Write-Host -n -f Cyan "REDDIT SEARCH "      
-        Write-Host -f DarkCyan "Searching SubReddit with title like $Search..."
-        Write-Verbose "Invoke-WebRequest Url: $Url"
-        Write-Verbose "Params = $Params"
-        $Response = (Invoke-WebRequest @Params).Content
-        $ResponseJson = $Response | ConvertFrom-Json
-        Write-Verbose "Invoke-WebRequest Response: $Response"
+    ForEach($d in $data){
+        Write-Host    -f DarkBlue "`n==================================================================================`n"
+        Write-Host -n -f Yellow     "`tCreated "
+        Write-Host    -f Red        "$($d.DateStr)" 
+        Write-Host -n -f DarkCyan   "`tScore   "
+        Write-Host    -f Cyan       "$($d.score)" 
+        Write-Host -n -f DarkRed    "`tTitle   "
+        Write-Host    -f DarkYellow "$($d.title)" 
+        Write-Host -n -f DarkMagenta "`tUrl     "
+        Write-Host    -f White       "$($d.post_url)" 
 
-        $DataList =  $ResponseList.data.children.data
-        if($Search -ne $Null){
-            ForEach($data in $DataList){
-                $Title = $Data.Title
-                $Name = $Data.Name
-                if($Title -match $Search){
-                  return $Data
-            }
-        }
+        $i++
     }
+}
+
+function Request-LatestUkrainePosts{
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+
+    $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
+    $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
+    $ThisUser = $UserCredz.UserName
+    $base = 'https://oauth.reddit.com'
+        
+    if(($Username -eq $Null)-Or($Username -eq '')){
+        $Username = $ThisUser
+    }
+    [String]$Url = "$base/r/ukraine/new"
+    $AuStr = 'bearer ' + (Get-RedditAuthenticationToken)
+    $HeadersData = @{
+        Authorization = $AuStr
+        user        = $Username
+    }
+    $BodyData = @{
+        grant_type  = 'password'
+        limit        = 100
+        username    = $UserCredz.UserName
+        password    = $UserCredz.GetNetworkCredential().Password    
+        user        = $Username
+    }
+    $Params = @{
+        Uri             = $Url
+        Body            = $BodyData
+        UserAgent       = Get-RedditModuleUserAgent
+        Headers         = $HeadersData
+        Method          = 'GET'
+        UseBasicParsing = $true
+    }      
+
+    Write-Verbose "Invoke-WebRequest Url: $Url"
+    Write-Verbose "Params = $Params"
+    $ResponseJson = (Invoke-WebRequest @Params).Content
+    $ResponseRaw = $ResponseJson | ConvertFrom-Json
+    Write-Verbose "Invoke-WebRequest ResponseJson: $ResponseJson"
+    $RedditPosts = Get-ParsedPostData $ResponseRaw
+    $RedditPostsCount = $RedditPosts.Count
+
+    return $RedditPosts
+    
 }
 
 
