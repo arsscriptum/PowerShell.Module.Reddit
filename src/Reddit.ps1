@@ -538,7 +538,7 @@ function Remove-AllRedditEntries{
     $Script:ProgressMessage = "Removing Entries"
     Write-ProgressHelper    
     ForEach($p in $allposts){ 
-        $idp = $p.Id ; 
+        $idp = $p.name ; 
         Remove-RedditPost -Id "$idp"; 
         $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
         if ($PSBoundParameters.ContainsKey('Verbose')) {
@@ -651,7 +651,7 @@ function Get-RedditComments{
             $Count = $Response.data.children.Count
             if($Count -eq 0){break;}
             $TotalCount += $Count
-            $PostNames = Get-PostNames $Response
+            $PostNames = Get-ParsedPostData $Response
             $PostNamesCount = $PostNames.Count
             Write-Verbose "$PostNamesCount post to remove"
             $index = $Response.data.children.Count - 1
