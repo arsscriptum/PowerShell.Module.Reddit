@@ -27,7 +27,13 @@ function Get-LatestUkrainePosts{
 
 function Request-LatestUkrainePosts{
     [CmdletBinding(SupportsShouldProcess)]
-    param()
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="num of entries")]
+        [int]$Number=50
+    ) 
+
+    if( $Number -gt 100 )  { $Number = 100 ; }
+    if( $Number -lt 1  )  { $Number = 1  ; }
 
     $UserCredz = Get-AppCredentials (Get-RedditUserCredentialID)
     $AppCredz = Get-AppCredentials (Get-RedditAppCredentialID)
@@ -45,7 +51,7 @@ function Request-LatestUkrainePosts{
     }
     $BodyData = @{
         grant_type  = 'password'
-        limit        = 100
+        limit       = $Number
         username    = $UserCredz.UserName
         password    = $UserCredz.GetNetworkCredential().Password    
         user        = $Username
