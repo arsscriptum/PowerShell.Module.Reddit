@@ -105,7 +105,7 @@ function Invoke-DownloadVideos{
             Write-Host "SUCCESS in $sec,$msec s" -f DarkGreen  
         }else{
             Write-Host -n "[DownloadVideos] " -f DarkRed
-            Write-Host "FAILED in $sec,$msec s . $cmdExitCode,$stdErr" -f DarkYellow  
+            Write-Host "FAILED [$cmdExitCode] [$stdErr]" -f DarkYellow  
         }
         <#$Out = &"$DlExe" "$item" | Out-Null
         $ReturnValue = $?
