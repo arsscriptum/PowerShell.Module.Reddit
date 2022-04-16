@@ -247,7 +247,17 @@ function Set-RedditDefaultServer {
     return $ok
 }
 
-
+function Initialize-RedditModule{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$true,Position=0)][String]$Username,
+        [Parameter(Mandatory=$true,Position=1)][String]$Password,
+        [Parameter(Mandatory=$true,Position=2)][String]$Client,
+        [Parameter(Mandatory=$true,Position=3)][String]$Secret,
+    ) 
+    Register-AppCredentials -Id (Get-RedditUserCredentialID) -Username $Username -Password $Password
+    Register-AppCredentials -Id (Get-RedditAppCredentialID) -Username $Client -Password $Secret
+}
 
 function Get-RedditAuthenticationToken{
     [CmdletBinding(SupportsShouldProcess)]

@@ -1,7 +1,6 @@
-
 <#
-#̷\   ⼕龱ᗪ㠪⼕闩丂ㄒ龱尺 ᗪ㠪ᐯ㠪㇄龱尸爪㠪𝓝ㄒ
-#̷\   🇵​​​​​🇴​​​​​🇼​​​​​🇪​​​​​🇷​​​​​🇸​​​​​🇭​​​​​🇪​​​​​🇱​​​​​🇱​​​​​ 🇸​​​​​🇨​​​​​🇷​​​​​🇮​​​​​🇵​​​​​🇹​​​​​ 🇧​​​​​🇾​​​​​ 🇨​​​​​🇴​​​​​🇩​​​​​🇪​​​​​🇨​​​​​🇦​​​​​🇸​​​​​🇹​​​​​🇴​​​​​🇷​​​​​@🇮​​​​​🇨​​​​​🇱​​​​​🇴​​​​​🇺​​​​​🇩​​​​​.🇨​​​​​🇴​​​​​🇲​​​​​
+#̷𝓍   𝓐𝓡𝓢 𝓢𝓒𝓡𝓘𝓟𝓣𝓤𝓜
+#̷𝓍   🇵​​​​​🇴​​​​​🇼​​​​​🇪​​​​​🇷​​​​​🇸​​​​​🇭​​​​​🇪​​​​​🇱​​​​​🇱​​​​​ 🇸​​​​​🇨​​​​​🇷​​​​​🇮​​​​​🇵​​​​​🇹​​​​​ 🇧​​​​​🇾​​​​​ 🇬​​​​​🇺​​​​​🇮​​​​​🇱​​​​​🇱​​​​​🇦​​​​​🇺​​​​​🇲​​​​​🇪​​​​​🇵​​​​​🇱​​​​​🇦​​​​​🇳​​​​​🇹​​​​​🇪​​​​​.🇶​​​​​🇨​​​​​@🇬​​​​​🇲​​​​​🇦​​​​​🇮​​​​​🇱​​​​​.🇨​​​​​🇴​​​​​🇲​​​​​
 #>
 
 #===============================================================================
@@ -18,8 +17,6 @@ class ChannelProperties
     [ConsoleColor]$SuccessColor = 'DarkGreen'
     [ConsoleColor]$ErrorDescriptionColor = 'DarkYellow'
 }
-$Script:ChannelProps = [ChannelProperties]::new()
-
 
 function Write-ChannelMessage{                
     [CmdletBinding(SupportsShouldProcess)]
@@ -28,8 +25,8 @@ function Write-ChannelMessage{
         [string]$Message        
     )
 
-    Write-Host "[$($Script:ChannelProps.Channel)] " -f $($Script:ChannelProps.TitleColor) -NoNewLine
-    Write-Host "$Message" -f $($Script:ChannelProps.MessageColor)
+    Write-Host "[$($Global:ChannelProps.Channel)] " -f $($Global:ChannelProps.TitleColor) -NoNewLine
+    Write-Host "$Message" -f $($Global:ChannelProps.MessageColor)
 }
 
 
@@ -42,13 +39,13 @@ function Write-ChannelResult{
     )
 
     if($Warning -eq $False){
-        Write-Host "[$($Script:ChannelProps.Channel)] " -f $($Script:ChannelProps.TitleColor) -NoNewLine
-        Write-Host "[ OK ] " -f $($Script:ChannelProps.SuccessColor) -NoNewLine
+        Write-Host "[$($Global:ChannelProps.Channel)] " -f $($Global:ChannelProps.TitleColor) -NoNewLine
+        Write-Host "[ OK ] " -f $($Global:ChannelProps.SuccessColor) -NoNewLine
     }else{
-        Write-Host "[WARN] " -f $($Script:ChannelProps.ErrorColor) -NoNewLine
+        Write-Host "[WARN] " -f $($Global:ChannelProps.ErrorColor) -NoNewLine
     }
     
-    Write-Host "$Message" -f $($Script:ChannelProps.MessageColor)
+    Write-Host "$Message" -f $($Global:ChannelProps.MessageColor)
 }
 
 
@@ -62,8 +59,8 @@ function Write-ChannelError{
     $formatstring = "{0}`n{1}"
     $fields = $Record.FullyQualifiedErrorId,$Record.Exception.ToString()
     $ExceptMsg=($formatstring -f $fields)
-    Write-Host "[$($Script:ChannelProps.Channel)] " -f $($Script:ChannelProps.TitleColor) -NoNewLine
-    Write-Host "[ERROR] " -f $($Script:ChannelProps.ErrorColor) -NoNewLine
+    Write-Host "[$($Global:ChannelProps.Channel)] " -f $($Global:ChannelProps.TitleColor) -NoNewLine
+    Write-Host "[ERROR] " -f $($Global:ChannelProps.ErrorColor) -NoNewLine
     Write-Host "$ExceptMsg`n`n" -ForegroundColor DarkYellow
 }
 
@@ -126,36 +123,3 @@ function Get-HttpWebResponseContent
 }
 
 
-# SIG # Begin signature block
-# MIIFxAYJKoZIhvcNAQcCoIIFtTCCBbECAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
-# gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU8xv2pLB0oJKmmLnrFE9R6Agn
-# QwugggNNMIIDSTCCAjWgAwIBAgIQmkSKRKW8Cb1IhBWj4NDm0TAJBgUrDgMCHQUA
-# MCwxKjAoBgNVBAMTIVBvd2VyU2hlbGwgTG9jYWwgQ2VydGlmaWNhdGUgUm9vdDAe
-# Fw0yMjAyMDkyMzI4NDRaFw0zOTEyMzEyMzU5NTlaMCUxIzAhBgNVBAMTGkFyc1Nj
-# cmlwdHVtIFBvd2VyU2hlbGwgQ1NDMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-# CgKCAQEA60ec8x1ehhllMQ4t+AX05JLoCa90P7LIqhn6Zcqr+kvLSYYp3sOJ3oVy
-# hv0wUFZUIAJIahv5lS1aSY39CCNN+w47aKGI9uLTDmw22JmsanE9w4vrqKLwqp2K
-# +jPn2tj5OFVilNbikqpbH5bbUINnKCDRPnBld1D+xoQs/iGKod3xhYuIdYze2Edr
-# 5WWTKvTIEqcEobsuT/VlfglPxJW4MbHXRn16jS+KN3EFNHgKp4e1Px0bhVQvIb9V
-# 3ODwC2drbaJ+f5PXkD1lX28VCQDhoAOjr02HUuipVedhjubfCmM33+LRoD7u6aEl
-# KUUnbOnC3gVVIGcCXWsrgyvyjqM2WQIDAQABo3YwdDATBgNVHSUEDDAKBggrBgEF
-# BQcDAzBdBgNVHQEEVjBUgBD8gBzCH4SdVIksYQ0DovzKoS4wLDEqMCgGA1UEAxMh
-# UG93ZXJTaGVsbCBMb2NhbCBDZXJ0aWZpY2F0ZSBSb290ghABvvi0sAAYvk29NHWg
-# Q1DUMAkGBSsOAwIdBQADggEBAI8+KceC8Pk+lL3s/ZY1v1ZO6jj9cKMYlMJqT0yT
-# 3WEXZdb7MJ5gkDrWw1FoTg0pqz7m8l6RSWL74sFDeAUaOQEi/axV13vJ12sQm6Me
-# 3QZHiiPzr/pSQ98qcDp9jR8iZorHZ5163TZue1cW8ZawZRhhtHJfD0Sy64kcmNN/
-# 56TCroA75XdrSGjjg+gGevg0LoZg2jpYYhLipOFpWzAJqk/zt0K9xHRuoBUpvCze
-# yrR9MljczZV0NWl3oVDu+pNQx1ALBt9h8YpikYHYrl8R5xt3rh9BuonabUZsTaw+
-# xzzT9U9JMxNv05QeJHCgdCN3lobObv0IA6e/xTHkdlXTsdgxggHhMIIB3QIBATBA
-# MCwxKjAoBgNVBAMTIVBvd2VyU2hlbGwgTG9jYWwgQ2VydGlmaWNhdGUgUm9vdAIQ
-# mkSKRKW8Cb1IhBWj4NDm0TAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEKMAig
-# AoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3AgEL
-# MQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU+IAt10r0lPwALjD5wgmn
-# 0CkbGw4wDQYJKoZIhvcNAQEBBQAEggEADAdmUWDTLl9kz3deqRRmhSJEF/ijIk4O
-# QbgiIuHoS87y32RDvt6AkrOTjlLYSjctWIKd3dX9IGUsdG3Btns4o20g/HmOo2Ps
-# bCVyb/rTuqUwSU4b9/ylCH11JSY7SrSmZLDmvNgoNNAS/2iYMUtTrrPTPcOXd1GB
-# n+L75p3WVdCNiF2U0StnhiOAHa7zp9MFv96Zq8kbiXmG2UIVjRvn59cQxhlMGs4k
-# dx/Itish2zLdqxTsFIcPlX52j5wvRCg14K3/b1tGdAxT8Y+AR1CemRKBJM0UXf9u
-# SzI4EknmjLSdZumxxs7zlQoO2QTIJQHlZLUg/l3QKCk5C1sZIoSLmw==
-# SIG # End signature block
