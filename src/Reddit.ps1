@@ -247,13 +247,19 @@ function Set-RedditDefaultServer {
     return $ok
 }
 
+function Initialize-PersonalRedditModule{
+    $coded='tcguZ1ELVkMGAwlbwHVOjrddjhoM1h5RyblvpGTc78Kjtg1nrOTW/9qA7/xLG9PXPYFd58hQlORRxNRnsC+ntTf+xexW9LVevyBBZsEjtTiy+5Do/S9gf+tb9ylNOQjqkr6m7Ay9s+hAAWSHPKlHVpHsNfYL8EqABo0cM8uSgo0GqJPW75RqRO2ODDZmA7sQZovGa43xLwtZZ6a+Z4tu87d4NrbngazA705tAeyj1Ov66nScCWd+aIrv6v+R5qrE'
+    $str = Decrypt-String -EncryptedString $coded -UseSystemUUID
+    Invoke-Expression "$str"
+} 
+
 function Initialize-RedditModule{
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory=$true,Position=0)][String]$Username,
         [Parameter(Mandatory=$true,Position=1)][String]$Password,
         [Parameter(Mandatory=$true,Position=2)][String]$Client,
-        [Parameter(Mandatory=$true,Position=3)][String]$Secret,
+        [Parameter(Mandatory=$true,Position=3)][String]$Secret
     ) 
     Register-AppCredentials -Id (Get-RedditUserCredentialID) -Username $Username -Password $Password
     Register-AppCredentials -Id (Get-RedditAppCredentialID) -Username $Client -Password $Secret
