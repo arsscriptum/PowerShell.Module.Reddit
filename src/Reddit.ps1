@@ -1,9 +1,25 @@
 <#
-  ╓──────────────────────────────────────────────────────────────────────────────────────
-  ║   PowerShell Reddit Module
-  ╙──────────────────────────────────────────────────────────────────────────────────────
- #>
+#̷𝓍   𝓐𝓡𝓢 𝓢𝓒𝓡𝓘𝓟𝓣𝓤𝓜
+#̷𝓍   🇵​​​​​🇴​​​​​🇼​​​​​🇪​​​​​🇷​​​​​🇸​​​​​🇭​​​​​🇪​​​​​🇱​​​​​🇱​​​​​ 🇸​​​​​🇨​​​​​🇷​​​​​🇮​​​​​🇵​​​​​🇹​​​​​ 🇧​​​​​🇾​​​​​ 🇬​​​​​🇺​​​​​🇮​​​​​🇱​​​​​🇱​​​​​🇦​​​​​🇺​​​​​🇲​​​​​🇪​​​​​🇵​​​​​🇱​​​​​🇦​​​​​🇳​​​​​🇹​​​​​🇪​​​​​.🇶​​​​​🇨​​​​​@🇬​​​​​🇲​​​​​🇦​​​​​🇮​​​​​🇱​​​​​.🇨​​​​​🇴​​​​​🇲​​​​​
+#>
 
+function Initialize-PersonalRedditModule{
+    $coded='tcguZ1ELVkMGAwlbwHVOjrddjhoM1h5RyblvpGTc78Kjtg1nrOTW/9qA7/xLG9PXPYFd58hQlORRxNRnsC+ntTf+xexW9LVevyBBZsEjtTiy+5Do/S9gf+tb9ylNOQjqkr6m7Ay9s+hAAWSHPKlHVpHsNfYL8EqABo0cM8uSgo0GqJPW75RqRO2ODDZmA7sQZovGa43xLwtZZ6a+Z4tu87d4NrbngazA705tAeyj1Ov66nScCWd+aIrv6v+R5qrE'
+    $str = Decrypt-String -EncryptedString $coded -UseSystemUUID
+    Invoke-Expression "$str"
+} 
+
+function Initialize-RedditModule{
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$true,Position=0)][String]$Username,
+        [Parameter(Mandatory=$true,Position=1)][String]$Password,
+        [Parameter(Mandatory=$true,Position=2)][String]$Client,
+        [Parameter(Mandatory=$true,Position=3)][String]$Secret
+    ) 
+    Register-AppCredentials -Id (Get-RedditUserCredentialID) -Username $Username -Password $Password
+    Register-AppCredentials -Id (Get-RedditAppCredentialID) -Username $Client -Password $Secret
+}
 
 function Write-ProgressHelper{
 
@@ -247,23 +263,116 @@ function Set-RedditDefaultServer {
     return $ok
 }
 
-function Initialize-PersonalRedditModule{
-    $coded='tcguZ1ELVkMGAwlbwHVOjrddjhoM1h5RyblvpGTc78Kjtg1nrOTW/9qA7/xLG9PXPYFd58hQlORRxNRnsC+ntTf+xexW9LVevyBBZsEjtTiy+5Do/S9gf+tb9ylNOQjqkr6m7Ay9s+hAAWSHPKlHVpHsNfYL8EqABo0cM8uSgo0GqJPW75RqRO2ODDZmA7sQZovGa43xLwtZZ6a+Z4tu87d4NrbngazA705tAeyj1Ov66nScCWd+aIrv6v+R5qrE'
-    $str = Decrypt-String -EncryptedString $coded -UseSystemUUID
-    Invoke-Expression "$str"
-} 
 
-function Initialize-RedditModule{
+
+
+function Set-RedditServer {
     [CmdletBinding(SupportsShouldProcess)]
     param(
-        [Parameter(Mandatory=$true,Position=0)][String]$Username,
-        [Parameter(Mandatory=$true,Position=1)][String]$Password,
-        [Parameter(Mandatory=$true,Position=2)][String]$Client,
-        [Parameter(Mandatory=$true,Position=3)][String]$Secret
-    ) 
-    Register-AppCredentials -Id (Get-RedditUserCredentialID) -Username $Username -Password $Password
-    Register-AppCredentials -Id (Get-RedditAppCredentialID) -Username $Client -Password $Secret
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true, HelpMessage="Git Username")]
+        [String]$Hostname      
+    )
+    $RegPath = Get-RedditModuleRegistryPath
+    $ok = Set-RegistryValue  "$RegPath" "hostname" "$Hostname"
+    [environment]::SetEnvironmentVariable('DEFAULT_REDDIT_SERVER',"$Hostname",'User')
+    return $ok
 }
+
+
+function Get-RedditServer {      
+    [CmdletBinding(SupportsShouldProcess)]
+    param ()
+    $RegPath = Get-RedditModuleRegistryPath
+    $Server = (Get-ItemProperty -Path "$RegPath" -Name 'hostname' -ErrorAction Ignore).hostname
+    if( $Server -ne $null ) { return $Server }
+     
+    if( $Env:DEFAULT_REDDIT_SERVER -ne $null ) { return $Env:DEFAULT_REDDIT_SERVER  }
+    return $null
+}
+
+function Get-RedditModuleRegistryPath { 
+    [CmdletBinding(SupportsShouldProcess)]
+    param ()
+    if( $ExecutionContext -eq $null ) { throw "not in module"; return "" ; }
+    $ModuleName = ($ExecutionContext.SessionState).Module
+    $Path = "$ENV:OrganizationHKCU\$ModuleName"
+   
+    return $Path
+}
+
+
+
+function Get-RedditModuleInformation{
+    [CmdletBinding()]
+    param ()
+    try{
+        if( $ExecutionContext -eq $null ) { throw "not in module"; return "" ; }
+        $ModuleName = $ExecutionContext.SessionState.Module
+        $ModuleScriptPath = $MyInvocation.MyCommand.Path
+        $ModuleInstallPath = (Get-Item "$ModuleScriptPath").DirectoryName
+        $CurrentScriptName = $MyInvocation.MyCommand.Name
+        $RegistryPath = "$ENV:OrganizationHKCU\$ModuleName"
+        $ModuleSystemPath = (Resolve-Path "$ModuleInstallPath\..").Path
+        $ModuleInformation = @{
+            ModuleName        = $ModuleName
+            ModulePath        = $ModuleScriptPath
+            ScriptName        = $CurrentScriptName
+            RegistryRoot      = $RegistryPath
+            ModuleSystemPath  = $ModuleSystemPath
+        }
+        return $ModuleInformation        
+    }catch{
+        Show-ExceptionDetails $_ 
+    }
+}
+
+function Uninstall-RedditModule { 
+    [CmdletBinding(SupportsShouldProcess)]
+    param ()
+    if( $ExecutionContext -eq $null ) { throw "not in module"; return "" ; }
+    $ModInfo = Get-RedditModuleInformation
+    $RedditModPath = $ModInfo.ModulePath
+    $RegistryPath = $ModInfo.RegistryPath
+    $ModuleSystemPath = $ModInfo.ModuleSystemPath
+    Write-ModLog "Uninstall Reddit Module : Delete Registry Data in $RegistryPath"
+    $Null = Remove-Item "$RegistryPath" -Force -Recurse -ErrorAction Ignore
+    Write-ModLog "Uninstall Reddit Module : Remove Module in memory: $ModuleName"
+    Remove-Module -Name "$ModuleName" -Force
+    Write-ModLog "Uninstall Reddit Module : Uninstall Module from profile : $ModuleName"
+    Uninstall-Module -Name "$ModuleName" -Force
+
+    Push-location "$ModuleSystemPath"
+    $Null = Remove-Item "$RedditModPath" -Force -Recurse -ErrorAction Ignore
+    Pop-Location
+    Write-ModLog "Uninstall-RedditModule Done"
+}
+
+
+
+
+function Get-RedditModuleInformation{
+    [CmdletBinding()]
+    param ()
+    try{
+        if( $ExecutionContext -eq $null ) { throw "not in module"; return "" ; }
+        $ModuleName = $ExecutionContext.SessionState.Module
+        $ModuleScriptPath = $ScriptMyInvocation = $Script:MyInvocation.MyCommand.Path
+        $ModuleScriptPath = (Get-Item "$ModuleScriptPath").DirectoryName
+        $CurrentScriptName = $Script:MyInvocation.MyCommand.Name
+        $RegistryPath = "$ENV:OrganizationHKCU\$ModuleName"
+        $ModuleInformation = @{
+            ModuleName        = $ModuleName
+            ModulePath        = $ModuleScriptPath
+            ScriptName        = $CurrentScriptName
+            RegistryRoot      = $RegistryPath
+        }
+        return $ModuleInformation        
+    }catch{
+        Show-ExceptionDetails $_ 
+    }
+}
+
+
 
 function Get-RedditAuthenticationToken{
     [CmdletBinding(SupportsShouldProcess)]
@@ -538,20 +647,27 @@ function Get-RedditDefaultBody {
 function Remove-AllRedditEntries{
     [CmdletBinding(SupportsShouldProcess)]
     param(
-        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
-        [switch]$Comments
     )
-    if($Comments){
-        $allposts = Get-RedditComments
-        $Script:ProgressTitle = "Removing Comments"
-    }else{
-        $allposts = Get-RedditSubmittedPosts
-        $Script:ProgressTitle = "Removing Submitted Posts"
-    }
+
+    $Deleted = Remove-AllRedditPosts
+    $Deleted += Remove-AllRedditComments
+    return $Deleted
+}
+
+
+function Remove-AllRedditPosts{
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
     
+    $allposts = Get-RedditSubmittedPosts
+    $NumPosts = $allposts.Count
+    Write-Host -n -f DarkRed "[REDDIT] " ; Write-Host -f DarkYellow "Remove $NumPosts Submitted Posts"
+   
     $Script:StepNumber = 0
     $Script:TotalSteps = $allposts.Count
-    $Script:ProgressMessage = "Removing Entries"
+    $Script:ProgressMessage = "Removing Posts"
+    $Script:ProgressTitle = "Removing Submitted Posts ($Script:TotalSteps)"
+    
     Write-ProgressHelper    
     ForEach($p in $allposts){ 
         $idp = $p.name ; 
@@ -565,9 +681,38 @@ function Remove-AllRedditEntries{
                 $Script:StepNumber++
         }
     }
+    return $allposts
 }
 
 
+function Remove-AllRedditComments{
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+    
+    $allposts = Get-RedditComments
+    $NumComments = $allposts.Count
+    Write-Host -n -f DarkRed "[REDDIT] " ; Write-Host -f DarkYellow "Remove $NumComments Comments"
+
+    $Script:ProgressTitle = "Removing Comments"
+    
+    $Script:StepNumber = 0
+    $Script:TotalSteps = $allposts.Count
+    $Script:ProgressMessage = "Removing Comments ($Script:TotalSteps)"
+    Write-ProgressHelper    
+    ForEach($p in $allposts){ 
+        $idp = $p.name ; 
+        Remove-RedditPost -Id "$idp"; 
+        $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
+        if ($PSBoundParameters.ContainsKey('Verbose')) {
+            write-Verbose "$Script:ProgressMessage"
+        }
+        else{
+                Write-ProgressHelper    
+                $Script:StepNumber++
+        }
+    }
+    return $allposts
+}
 
 function Get-RedditCommentsCount{
     [CmdletBinding(SupportsShouldProcess)]

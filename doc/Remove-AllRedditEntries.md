@@ -1,7 +1,7 @@
 ---
 external help file: PowerShell.Module.Reddit-help.xml
 Module Name: PowerShell.Module.Reddit
-online version: https://psraw.readthedocs.io/en/latest/Module/Connect-Reddit
+online version:
 schema: 2.0.0
 ---
 
@@ -13,7 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Remove-AllRedditEntries [-Comments] [-WhatIf] [-Confirm] [<CommonParameters>]
+Remove-AllRedditEntries [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -29,21 +29,6 @@ PS C:\> {{ Add example code here }}
 {{ Add example description here }}
 
 ## PARAMETERS
-
-### -Comments
-Overwrite if present
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: True (ByValue)
-Accept wildcard characters: False
-```
 
 ### -Confirm
 Prompts you for confirmation before running the cmdlet.
@@ -81,7 +66,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.Management.Automation.SwitchParameter
+### None
 
 ## OUTPUTS
 

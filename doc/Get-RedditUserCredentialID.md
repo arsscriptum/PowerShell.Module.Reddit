@@ -1,7 +1,7 @@
 ---
 external help file: PowerShell.Module.Reddit-help.xml
 Module Name: PowerShell.Module.Reddit
-online version: https://psraw.readthedocs.io/en/latest/Module/Connect-Reddit
+online version:
 schema: 2.0.0
 ---
 
