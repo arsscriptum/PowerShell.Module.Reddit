@@ -4,9 +4,10 @@
 #>
 
 function Initialize-PersonalRedditModule{
-    $coded='tcguZ1ELVkMGAwlbwHVOjrddjhoM1h5RyblvpGTc78Kjtg1nrOTW/9qA7/xLG9PXPYFd58hQlORRxNRnsC+ntTf+xexW9LVevyBBZsEjtTiy+5Do/S9gf+tb9ylNOQjqkr6m7Ay9s+hAAWSHPKlHVpHsNfYL8EqABo0cM8uSgo0GqJPW75RqRO2ODDZmA7sQZovGa43xLwtZZ6a+Z4tu87d4NrbngazA705tAeyj1Ov66nScCWd+aIrv6v+R5qrE'
-    $str = Decrypt-String -EncryptedString $coded -UseSystemUUID
-    Invoke-Expression "$str"
+    $coded_par="YJgcD5IelqqGHo62EHJOOaCeyFFfNe+Kl7zJ2G4kV8DsdOyYuWRaFslikpMxnBDxCBWjCzWQr5zvc6DAtoK7oqpeWAhp1cpZhX2iI8PQ1gV92jLaK0AzRnsAq/4amL6thnmef/O2FnXa3t6iYwgTbEGpfk7v44CPGSsMQ7TzYhCvuGn/U6EK9l37PI1nn0GMPD0MgtlDrYQgR3ZMPm044eFXvsGrk2uslXS5AlgAeuU6eaSFoDoxI3NhwJKbnHmrX3X12mPl1Yw3B0kjynnqewdL16l/gi7uY6r+besKw34="
+    $coded_lap='tcguZ1ELVkMGAwlbwHVOjrddjhoM1h5RyblvpGTc78Kjtg1nrOTW/9qA7/xLG9PXPYFd58hQlORRxNRnsC+ntTf+xexW9LVevyBBZsEjtTiy+5Do/S9gf+tb9ylNOQjqkr6m7Ay9s+hAAWSHPKlHVpHsNfYL8EqABo0cM8uSgo0GqJPW75RqRO2ODDZmA7sQZovGa43xLwtZZ6a+Z4tu87d4NrbngazA705tAeyj1Ov66nScCWd+aIrv6v+R5qrE'
+    $exec = Decrypt-String -EncryptedString $coded_par -UseSystemUUID
+    Invoke-Expression "$exec"
 } 
 
 function Initialize-RedditModule{
@@ -656,8 +657,25 @@ function Remove-AllRedditEntries{
 
 
 function Remove-AllRedditPosts{
-    [CmdletBinding(SupportsShouldProcess)]
-    param()
+[CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [switch]$ForceDeleteAll,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [switch]$Test
+    )   
+    $TestMode = $False
+    if ($PSBoundParameters.ContainsKey('Verbose')) {
+        Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+        Write-Host "Verbose OUTPUT" -f DarkYellow            
+    }
+    if ( ($PSBoundParameters.ContainsKey('WhatIf') -Or($PSBoundParameters.ContainsKey('Test')))) {
+        Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+        Write-Host "TEST ONLY" -f DarkYellow            
+        $TestMode = $True
+    }
+    $RedditPermanentComments = Get-RegListItemList -Id "RedditPermanentComments"
+
     
     $allposts = Get-RedditSubmittedPosts
     $NumPosts = $allposts.Count
@@ -667,10 +685,28 @@ function Remove-AllRedditPosts{
     $Script:TotalSteps = $allposts.Count
     $Script:ProgressMessage = "Removing Posts"
     $Script:ProgressTitle = "Removing Submitted Posts ($Script:TotalSteps)"
-    
+    $Script:DeletedPosts = @()
     Write-ProgressHelper    
     ForEach($p in $allposts){ 
         $idp = $p.name ; 
+
+        
+        if($ForceDeleteAll -eq $False){
+            $ShouldKeep = $RedditPermanentComments.Contains($idp)
+            if($ShouldKeep -eq $True){
+                Write-Host '[Remove-AllRedditPosts] ' -f DarkCyan -NoNewLine
+                Write-Host "Post $idp is permanent, keeping..." -f DarkGreen
+                continue;
+            }
+        }
+        if($TestMode -eq $False){
+            Remove-RedditPost -Id "$idp";   
+            $Script:DeletedPosts += $idp
+        }else{
+            Write-Host '[TESTMODE] ' -f DarkRed -NoNewLine
+            Write-Host "Would Delete $idp" -f DarkYellow
+        }
+
         Remove-RedditPost -Id "$idp"; 
         $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
         if ($PSBoundParameters.ContainsKey('Verbose')) {
@@ -681,28 +717,63 @@ function Remove-AllRedditPosts{
                 $Script:StepNumber++
         }
     }
-    return $allposts
+   
+    $numdeleted = $Script:DeletedPosts.Count
+    Write-Host "Deleted $numdeleted posts ($numdeleted / $NumPosts total)"
+    return $Script:DeletedPosts
 }
 
 
 function Remove-AllRedditComments{
-    [CmdletBinding(SupportsShouldProcess)]
-    param()
-    
+ [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [switch]$ForceDeleteAll,
+        [Parameter(Mandatory=$false, ValueFromPipeline=$true, HelpMessage="Overwrite if present")]
+        [switch]$Test
+    )   
+    $TestMode = $False
+    if ($PSBoundParameters.ContainsKey('Verbose')) {
+        Write-Host '[Remove-AllRedditComments] ' -f DarkRed -NoNewLine
+        Write-Host "Verbose OUTPUT" -f DarkYellow            
+    }
+    if ( ($PSBoundParameters.ContainsKey('WhatIf') -Or($PSBoundParameters.ContainsKey('Test')))) {
+        Write-Host '[Remove-AllRedditComments] ' -f DarkRed -NoNewLine
+        Write-Host "TEST ONLY" -f DarkYellow            
+        $TestMode = $True
+    }
+    $RedditPermanentComments = Get-RegListItemList -Id "RedditPermanentComments"
+
     $allposts = Get-RedditComments
     $NumComments = $allposts.Count
     Write-Host -n -f DarkRed "[REDDIT] " ; Write-Host -f DarkYellow "Remove $NumComments Comments"
 
     $Script:ProgressTitle = "Removing Comments"
-    
+    $Script:DeletedPosts = @()
     $Script:StepNumber = 0
     $Script:TotalSteps = $allposts.Count
     $Script:ProgressMessage = "Removing Comments ($Script:TotalSteps)"
     Write-ProgressHelper    
     ForEach($p in $allposts){ 
         $idp = $p.name ; 
-        Remove-RedditPost -Id "$idp"; 
-        $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
+        
+        if($ForceDeleteAll -eq $False){
+            $ShouldKeep = $RedditPermanentComments.Contains($idp)
+            if($ShouldKeep -eq $True){
+                Write-Host '[Remove-AllRedditComments] ' -f DarkCyan -NoNewLine
+                Write-Host "Post $idp is permanent, keeping..." -f DarkGreen
+                continue;
+            }
+        }
+        if($TestMode -eq $False){
+            Remove-RedditPost -Id "$idp";   
+            $Script:DeletedPosts += $idp
+        }else{
+            Write-Host '[TESTMODE] ' -f DarkRed -NoNewLine
+            Write-Host "Would Delete $idp" -f DarkYellow
+        }
+        
+        $Script:ProgressMessage = "Deleting $idp ($Script:StepNumber / $Script:TotalSteps)"
         if ($PSBoundParameters.ContainsKey('Verbose')) {
             write-Verbose "$Script:ProgressMessage"
         }
@@ -711,7 +782,11 @@ function Remove-AllRedditComments{
                 $Script:StepNumber++
         }
     }
-    return $allposts
+
+    $numtotal = $allposts.Count
+    $numdeleted = $Script:DeletedPosts.Count
+    Write-Host "Deleted $numdeleted posts ($numdeleted / $numtotal total)"
+    return $Script:DeletedPosts
 }
 
 function Get-RedditCommentsCount{
@@ -728,7 +803,7 @@ function Get-RedditCommentsCount{
     )   
 
         if ($PSBoundParameters.ContainsKey('Verbose')) {
-            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+            Write-Host '[Get-RedditCommentsCount] ' -f DarkRed -NoNewLine
             Write-Host "Verbose OUTPUT" -f Yellow            
         }
         $RegPath = Get-RedditModuleRegistryPath
@@ -783,7 +858,7 @@ function Get-RedditComments{
     )   
 
         if ($PSBoundParameters.ContainsKey('Verbose')) {
-            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+            Write-Host '[Get-RedditComments] ' -f DarkRed -NoNewLine
             Write-Host "Verbose OUTPUT" -f Yellow            
         }
         $RegPath = Get-RedditModuleRegistryPath
@@ -841,7 +916,7 @@ function Get-RedditSubmittedPosts{
     )   
 
         if ($PSBoundParameters.ContainsKey('Verbose')) {
-            Write-Host '[Remove-AllRedditPosts] ' -f DarkRed -NoNewLine
+            Write-Host '[Get-RedditSubmittedPosts] ' -f DarkRed -NoNewLine
             Write-Host "Verbose OUTPUT" -f Yellow            
         }
         $RegPath = Get-RedditModuleRegistryPath
