@@ -674,7 +674,7 @@ function Remove-AllRedditPosts{
         Write-Host "TEST ONLY" -f DarkYellow            
         $TestMode = $True
     }
-    $RedditPermanentComments = Get-RegListItemList -Id "RedditPermanentComments"
+    $RedditPermanentComments = Get-RegListItemList -Id "RedditPermanentPosts"
 
     
     $allposts = Get-RedditSubmittedPosts
@@ -707,8 +707,7 @@ function Remove-AllRedditPosts{
             Write-Host "Would Delete $idp" -f DarkYellow
         }
 
-        Remove-RedditPost -Id "$idp"; 
-        $Script:ProgressMessage = "Deleting $postid ($Script:StepNumber / $Script:TotalSteps)"
+        $Script:ProgressMessage = "Deleting $idp ($Script:StepNumber / $Script:TotalSteps)"
         if ($PSBoundParameters.ContainsKey('Verbose')) {
             write-Verbose "$Script:ProgressMessage"
         }
